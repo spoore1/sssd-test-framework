@@ -392,8 +392,8 @@ class SUAuthenticationUtils(MultihostUtility[MultihostHost]):
 
             LD_PRELOAD=/opt/random.so umockdev-run \
                 --device '{device_path}' \
-                --ioctl '/dev/hidraw1={ioctl_path}' \
-                --script '/dev/hidraw1={script_path}' \
+                --ioctl '/dev/hidraw2={ioctl_path}' \
+                --script '/dev/hidraw2={script_path}' \
                 -- '{run_su}'
             """,
             mode="a=rx",

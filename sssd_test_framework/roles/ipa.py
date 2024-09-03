@@ -543,8 +543,8 @@ class IPAUser(IPAObject):
 
             LD_PRELOAD=/opt/random.so umockdev-run \
                 --device '{device_path}'                \
-                --ioctl '/dev/hidraw1={ioctl_path}'     \
-                --script '/dev/hidraw1={script_path}'   \
+                --ioctl '/dev/hidraw2={ioctl_path}'     \
+                --script '/dev/hidraw2={script_path}'   \
                 -- ipa user-add-passkey '{self.name}' --register --cose-type=es256 --require-user-verification={verify}
             """,
             mode="a=rx",

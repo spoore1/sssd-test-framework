@@ -141,8 +141,8 @@ class SSSCTLUtils(MultihostUtility[MultihostHost]):
 
             LD_PRELOAD=/opt/random.so umockdev-run      \
                 --device '{device_path}'                \
-                --ioctl '/dev/hidraw1={ioctl_path}'     \
-                --script '/dev/hidraw1={script_path}'   \
+                --ioctl '/dev/hidraw2={ioctl_path}'     \
+                --script '/dev/hidraw2={script_path}'   \
                 -- sssctl passkey-register --username '{username}' --domain '{domain}' -d=0xfff0 --debug-libfido2
             """,
             mode="a=rx",
