@@ -17,6 +17,7 @@ from .topology_controllers import (
     KeycloakTopologyController,
     LDAPTopologyController,
     SambaTopologyController,
+    GDMTopologyController,
 )
 
 __all__ = [
@@ -50,6 +51,13 @@ class KnownTopology(KnownTopologyBase):
     """
     .. topology-mark:: KnownTopology.Client
     """
+
+    GDM = SSSDTopologyMark(
+        name="gdm",
+        topology=Topology(TopologyDomain("sssd", client=1, ipa=1, keycloak=1)),
+        controller=GDMTopologyController(),
+        fixtures=dict(client="sssd.client[0]", ipa="sssd.ipa[0]", provider="sssd.ipa[0]", keycloak="sssd.keycloak[0]"),
+    )
 
     LDAP = SSSDTopologyMark(
         name="ldap",
