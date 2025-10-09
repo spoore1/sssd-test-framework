@@ -14,6 +14,7 @@ from pytest_mh.cli import CLIBuilder, CLIBuilderArgs
 from pytest_mh.conn import ProcessError, ProcessResult
 from pytest_mh.utils.fs import LinuxFileSystem
 
+from ..roles.client import Client
 from ..hosts.ipa import IPAHost
 from ..misc import attrs_include_value, attrs_parse, ip_version, to_list, to_list_of_strings, to_list_without_none
 from ..utils.sssctl import SSSCTLUtils
@@ -807,7 +808,7 @@ class IPAUser(IPAObject):
             )
 
         return result.stdout_lines[-1].strip()
-
+    
     def passkey_remove(self, passkey_mapping: str) -> IPAUser:
         """
         Add passkey mapping from the user.
@@ -819,6 +820,55 @@ class IPAUser(IPAObject):
         """
         self._exec("remove-passkey", [passkey_mapping])
         return self
+
+    def vfido_passkey_add_register(
+        self,
+        client: Client,
+        pin: str | int,
+    ) -> str:
+        """
+        Register user passkey when using virtual-fido
+        """
+
+        client.host.conn.exec(["kinit", f"{self.host.adminuser}@{self.host.realm}"], input=self.host.adminpw)
+
+        result = client.host.conn.expect(
+            f"""
+            spawn ipa user-add-passkey {self.name} --register
+            set ID_reg $spawn_id
+
+            expect {{
+                -i $ID_reg -re "Enter PIN:*" {{}}
+                -i $ID_reg timeout {{puts "expect result: Unexpected output"; exit 201}}
+                -i $ID_reg eof {{puts "expect result: Unexpected end of file"; exit 202}}
+            }}
+
+            puts "Entering PIN\n"
+            send -i $ID_reg "{pin}\r"
+
+            expect {{
+                -i $ID_reg -re "Please touch the device.*" {{}}
+                -i $ID_reg timeout {{puts "expect result: Unexpected output"; exit 203}}
+                -i $ID_reg eof {{puts "expect result: Unexpected end of file"; exit 204}}
+            }}
+
+            puts "Touching device"
+            spawn /opt/test_venv/bin/vfido_touch
+            set ID_touch $spawn_id
+            
+            expect {{
+                -i $ID_reg -re "Added passkey mappings.*" {{}}
+                -i $ID_reg timeout {{puts "expect result: Unexpected output"; exit 205}}
+                -i $ID_reg eof {{puts "expect result: Unexpected end of file"; exit 206}}
+            }}
+
+            expect -i $ID_reg eof
+            expect -i $ID_touch eof
+            """,
+            raise_on_error=True,
+        )
+
+        return result.stdout_lines[-1].strip()
 
     def iduseroverride(self) -> IDUserOverride:
         """
