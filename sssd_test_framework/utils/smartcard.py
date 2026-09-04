@@ -239,7 +239,13 @@ class SmartCardUtils(MultihostUtility[MultihostHost]):
         self.add_key(key)
         self.add_cert(cert)
         client.authselect.select("sssd", ["with-smartcard"])
+
+        client.host.conn.run("sed -i -e 's:^\s*#\?\s*debug\s*=.*:\tdebug = 3;:' /etc/opensc.conf")
+        client.host.conn.run("sed -i -e 's:^\s*#\?\s*debug_file\s*=.*:\tdebug_file = /var/log/sssd/opensc-debug.txt;:' /etc/opensc.conf")
+        client.host.conn.run("sed -i -e 's:var/log:var/log/sssd:' /etc/systemd/system/virt_cacard.service")
+        self.svc.reload_daemon()
         self.svc.restart("virt_cacard.service")
+
         client.sssd.common.local()
         client.sssd.dom("local")["local_auth_policy"] = "only"
         client.sssd.section(f"certmap/local/{username}")["matchrule"] = "<SUBJECT>.*CN=Test Cert.*"
