@@ -340,10 +340,11 @@ class LocalUser(GenericUser):
             "shell": (self.util.cli.option.VALUE, shell),
         }
 
-        passwd = f" && passwd --stdin '{self._name}'" if password else ""
+        # Using chpasswd instead of passwd to be more compatible with STIG tests
+        passwd = f" && echo '{self._name}:{password}' | chpasswd" if password else ""
         self.util.logger.info(f'Creating local user "{self._name}" on {self.util.host.hostname}')
         self.util.host.conn.run(
-            self.util.cli.command("useradd", args) + passwd, input=password, log_level=ProcessLogLevel.Error
+            self.util.cli.command("useradd", args) + passwd, log_level=ProcessLogLevel.Error
         )
 
         self.util._users.append(self._name)
@@ -391,10 +392,11 @@ class LocalUser(GenericUser):
             "shell": (self.util.cli.option.VALUE, shell),
         }
 
-        passwd = f" && passwd --stdin '{self._name}'" if password else ""
+        # Using chpasswd instead of passwd to be more compatible with STIG tests
+        passwd = f" && echo '{self._name}:{password}' | chpasswd" if password else ""
         self.util.logger.info(f'Modifying local user "{self._name}" on {self.util.host.hostname}')
         self.util.host.conn.run(
-            self.util.cli.command("usermod", args) + passwd, input=password, log_level=ProcessLogLevel.Error
+            self.util.cli.command("usermod", args) + passwd, log_level=ProcessLogLevel.Error
         )
 
         return self
