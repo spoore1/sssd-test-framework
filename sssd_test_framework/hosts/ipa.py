@@ -139,6 +139,7 @@ class IPAHost(BaseDomainHost, BaseLinuxHost):
                 set -x
 
                 function backup {
+                    echo "Backing up [$1] to [$2]"
                     if [ -d "$1" ] || [ -f "$1" ]; then
                         cp --force --archive "$1" "$2"
                     fi
@@ -148,10 +149,55 @@ class IPAHost(BaseDomainHost, BaseLinuxHost):
 
                 path=`mktemp -d`
 
+                echo "First enabling debug logging"
+                ds_inst=`dsctl -l|sed 's/^slapd-//'`
+                dsconf $ds_inst config replace nsslapd-errorlog-level=1
+
+                echo "Backing up IPA server from files"
                 systemctl stop dirsrv.target
+                set +e
+
+                echo "Waiting for ns-slapd processes to stop..."
+                count=0
+                while pgrep -a ns-slapd > /dev/null; do
+                    if [ "$count" -ge "60" ]; then
+                        echo "Directory server failed to stop in 60 seconds"
+                        exit 1
+                    fi
+                    ((count++))
+                    sleep 1
+                done
+
+                echo "All ns-slapd processes stopped."
+                pgrep -a ns-slapd
+
+                set -e
+
+                echo "Backed up /etc/dirsrv files to $path/dirsrv-etc"
                 backup /etc/dirsrv "$path/dirsrv-etc"
+                echo "=============== find /etc/dirsrv ================"
+                find /etc/dirsrv -ls -printf '%i %p\n'
+                echo "=============== find $path/dirsrv-etc ================"
+                find $path/dirsrv-etc -ls -printf '%i %p\n'
+                echo "=============== diff /etc/dirsrv $path/dirsrv-etc ================"
+                diff --recursive /etc/dirsrv $path/dirsrv-etc
+                echo "==================================="
+
+                echo "Backed up /var/lib/dirsrv files to $path/dirsrv-lib"
                 backup /var/lib/dirsrv "$path/dirsrv-lib"
+                echo "=============== find /var/lib/dirsrv ================"
+                find /var/lib/dirsrv -ls -printf '%i %p\n'
+                echo "=============== find $path/dirsrv-lib ================"
+                find $path/dirsrv-lib -ls -printf '%i %p\n'
+                echo "===============diff /var/lib/dirsrv $path/dirsrv-lib ================"
+                diff --recursive /var/lib/dirsrv $path/dirsrv-lib
+                echo "==================================="
+
                 systemctl start dirsrv.target
+
+                systemctl status dirsrv.target -l
+                systemctl status dirsrv@*.service -l
+                ipactl status
 
                 backup /etc/krb5.conf "$path/krb5.conf"
                 backup /etc/krb5.keytab "$path/krb5.keytab"
@@ -188,6 +234,7 @@ class IPAHost(BaseDomainHost, BaseLinuxHost):
                 set -x
 
                 function restore {{
+                    echo "Restoring from [$1] to [$2]"
                     rm --force --recursive "$2"
                     if [ -d "$1" ] || [ -f "$1" ]; then
                         cp --force --archive "$1" "$2"
@@ -196,10 +243,43 @@ class IPAHost(BaseDomainHost, BaseLinuxHost):
 
                 set -e
 
+                echo "First enabling debug logging"
+                ds_inst=`dsctl -l|sed 's/^slapd-//'`
+                dsconf $ds_inst config replace nsslapd-errorlog-level=1
+
+                echo "Restoring IPA server from file backups"
                 systemctl stop dirsrv.target
+                set +e
+
+                echo "Waiting for ns-slapd processes to stop..."
+                count=0
+                while pgrep -a ns-slapd > /dev/null; do
+                    if [ "$count" -ge "60" ]; then
+                        echo "Directory server failed to stop in 60 seconds"
+                        exit 1
+                    fi
+                    ((count++))
+                    sleep 1
+                done
+
+                echo "All ns-slapd processes stopped."
+                pgrep -a ns-slapd
+
+                set -e
+
+                echo "Restoring /etc/dirsrv from {backup_path}/dirsrv-etc files:"
+                find {backup_path}/dirsrv-etc -ls
                 restore "{backup_path}/dirsrv-etc" /etc/dirsrv
+
+                echo "Restoring /var/lib/dirsrv from {backup_path}/dirsrv-lib files:"
+                find {backup_path}/dirsrv-lib -ls
                 restore "{backup_path}/dirsrv-lib" /var/lib/dirsrv
+
                 systemctl start dirsrv.target
+
+                systemctl status dirsrv.target -l
+                systemctl status dirsrv@*.service -l
+                ipactl status
 
                 rm --force --recursive /etc/sssd /var/lib/sss /var/log/sssd
                 restore "{backup_path}/krb5.conf" /etc/krb5.conf
